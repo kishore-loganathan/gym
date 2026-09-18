@@ -36,10 +36,20 @@ export async function POST(req) {
     if (!weeklyCheckins || weeklyCheckins.length === 0) weeklyCheckins = getFallbackWeekly();
 
     let excludeSundays = false;
+    let START_WEIGHT = 90.0;
+    let TARGET_WEIGHT = 80.0;
+    let START_DATE_STR = '2026-09-17';
+    let END_DATE_STR = '2027-01-01';
     if (dbReady) {
       try {
         const settings = await UserSettings.findOne({ key: 'default_goal' });
-        excludeSundays = !!(settings && settings.excludeSundays);
+        if (settings) {
+          excludeSundays = !!settings.excludeSundays;
+          if (settings.startWeight !== undefined) START_WEIGHT = settings.startWeight;
+          if (settings.targetWeight !== undefined) TARGET_WEIGHT = settings.targetWeight;
+          if (settings.startDate) START_DATE_STR = settings.startDate;
+          if (settings.endDate) END_DATE_STR = settings.endDate;
+        }
       } catch (e) {}
     }
     dailyLogs = excludeSundaysIf(dailyLogs, excludeSundays);
@@ -47,9 +57,9 @@ export async function POST(req) {
     const apiKey = body.apiKey || process.env.GEMINI_API_KEY || '';
 
     // Gather Stats for Prompt
-    const START_WEIGHT = 90.0;
-    const TARGET_WEIGHT = 80.0;
-    const TOTAL_DAYS = 107;
+    const sDate = new Date(START_DATE_STR + 'T00:00:00Z');
+    const eDate = new Date(END_DATE_STR + 'T00:00:00Z');
+    const TOTAL_DAYS = Math.max(1, Math.round((eDate.getTime() - sDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
 
     const logsWithWeight = dailyLogs.filter(d => d.weight !== null && d.weight > 0);
     const currentWeight = logsWithWeight.length > 0 ? logsWithWeight[logsWithWeight.length - 1].weight : START_WEIGHT;
@@ -58,6 +68,7 @@ export async function POST(req) {
 
     let habitCounts = { workout: 0, homeFood: 0, noSweets: 0, noMaida: 0, noHotelFood: 0, sleepTarget: 0 };
     let totalCheckmarks = 0;
+    let tempStreak = 0;
     let streak = 0;
     const todayStr = new Date().toISOString().split('T')[0];
     let daysElapsed = 0;
@@ -73,19 +84,27 @@ export async function POST(req) {
 
       const cnt = (log.workout?1:0) + (log.homeFood?1:0) + (log.noSweets?1:0) + (log.noMaida?1:0) + (log.noHotelFood?1:0) + (log.sleepTarget?1:0);
       totalCheckmarks += cnt;
-      if (log.workout || cnt >= 4) streak++; else streak = 0;
+      if (log.workout || cnt >= 4) tempStreak++; else tempStreak = 0;
+      // Only count the streak up through today — the array includes
+      // future, not-yet-lived days that would otherwise reset it to 0.
+      if (log.date <= todayStr) streak = tempStreak;
     });
 
-    const consistencyPct = +((totalCheckmarks / (TOTAL_DAYS * 6)) * 100).toFixed(1);
+    // Consistency is measured against days actually elapsed so far, not the
+    // full goal duration — otherwise a user on day 1 of a 107-day plan would
+    // show a misleadingly tiny percentage (e.g. 3/6 habits = 0.5% instead of 50%).
+    const effectiveDays = Math.max(1, daysElapsed);
+    const consistencyPct = +((totalCheckmarks / (effectiveDays * 6)) * 100).toFixed(1);
     const daysRemaining = Math.max(0, TOTAL_DAYS - daysElapsed);
 
     // Try calling Gemini REST API if key provided
     if (apiKey) {
       try {
-        const prompt = `Act as an expert Fitness & Weight Loss Coach analyzing a user's 107-day weight loss tracker (Target: 90 kg -> 80 kg).
-Start Weight: 90.0 kg | Current Weight: ${currentWeight} kg | Target Weight: 80.0 kg
+        const prompt = `Act as an expert Fitness & Weight Loss Coach analyzing a user's weight loss tracker (Target: ${START_WEIGHT} kg -> ${TARGET_WEIGHT} kg over ${TOTAL_DAYS} days).
+The user is currently on Day ${daysElapsed} of ${TOTAL_DAYS} (${daysRemaining} days remaining) — do not describe the plan as finished or as if all ${TOTAL_DAYS} days have already passed.
+Start Weight: ${START_WEIGHT} kg | Current Weight: ${currentWeight} kg | Target Weight: ${TARGET_WEIGHT} kg
 Total Weight Lost: ${weightLost} kg (${weightRemaining} kg remaining)
-Overall Habit Consistency: ${consistencyPct}%
+Habit Consistency So Far (Day ${daysElapsed}): ${consistencyPct}%
 Current Streak: ${streak} days
 
 Provide a structured, highly motivating AI Coaching Analysis in JSON format:
@@ -128,7 +147,7 @@ Provide a structured, highly motivating AI Coaching Analysis in JSON format:
     const grade = consistencyPct >= 80 ? 'A+' : (consistencyPct >= 60 ? 'A' : (consistencyPct >= 40 ? 'B+' : 'B'));
     const smartFallback = {
       performanceGrade: grade,
-      summary: `You have achieved ${weightLost} kg weight loss so far with an overall habit consistency of ${consistencyPct}%. You have ${daysRemaining} days remaining to reach your target of 80.0 kg.`,
+      summary: `You have achieved ${weightLost} kg weight loss so far with an overall habit consistency of ${consistencyPct}% (Day ${daysElapsed} of ${TOTAL_DAYS}). You have ${daysRemaining} days remaining to reach your target of ${TARGET_WEIGHT} kg.`,
       strengths: [
         `Strong commitment with a ${streak}-day active consistency streak!`,
         `Solid compliance on Home Food (${habitCounts.homeFood} days) and Gym workouts (${habitCounts.workout} days).`

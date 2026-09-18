@@ -103,8 +103,9 @@ export default function Page() {
       }
     } catch (e) {}
 
-    // Background sync with MongoDB Atlas
-    syncWithServer();
+    // Always fetch live data on load/refresh instead of relying on the
+    // server's short-lived cache, so a refresh reflects the latest state.
+    syncWithServer(true);
   }, []);
 
   const handleUpdateDailyLog = async (updatedLog) => {

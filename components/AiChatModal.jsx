@@ -2,7 +2,21 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Bot, User, X, Sparkles, RefreshCw, MessageSquare } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import { useToast } from '@/components/ToastProvider';
+
+const markdownComponents = {
+  h1: (props) => <h3 className="text-sm font-bold text-slate-900 mt-2 mb-1" {...props} />,
+  h2: (props) => <h3 className="text-sm font-bold text-slate-900 mt-2 mb-1" {...props} />,
+  h3: (props) => <h4 className="text-xs font-bold text-slate-900 mt-2 mb-1" {...props} />,
+  p: (props) => <p className="mb-2 last:mb-0" {...props} />,
+  ul: (props) => <ul className="list-disc pl-4 space-y-1 mb-2" {...props} />,
+  ol: (props) => <ol className="list-decimal pl-4 space-y-1 mb-2" {...props} />,
+  li: (props) => <li {...props} />,
+  strong: (props) => <strong className="font-bold text-slate-900" {...props} />,
+  em: (props) => <em {...props} />,
+  code: (props) => <code className="px-1 py-0.5 rounded bg-slate-100 text-emerald-700 text-[11px]" {...props} />
+};
 
 export default function AiChatModal({ isOpen, onClose, stats }) {
   const { showToast } = useToast();
@@ -111,7 +125,11 @@ export default function AiChatModal({ isOpen, onClose, stats }) {
                     : 'bg-white border border-slate-200 text-slate-800 rounded-tl-none shadow-sm'
                 }`}
               >
-                {msg.text}
+                {msg.sender === 'ai' ? (
+                  <ReactMarkdown components={markdownComponents}>{msg.text}</ReactMarkdown>
+                ) : (
+                  msg.text
+                )}
               </div>
 
               {msg.sender === 'user' && (

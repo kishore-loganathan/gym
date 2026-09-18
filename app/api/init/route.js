@@ -158,9 +158,15 @@ export async function GET(req) {
       } else {
         tempStreak = 0;
       }
+
+      // Capture the streak as of today — the loop keeps running through
+      // future, not-yet-lived days (blank by default), which would
+      // otherwise reset tempStreak to 0 by the time the loop ends.
+      if (log.date <= todayStr) {
+        currentStreak = tempStreak;
+      }
     });
 
-    currentStreak = tempStreak;
     const totalCheckableUnits = TOTAL_DAYS * 6;
     const overallConsistencyPct = +((totalCheckmarksAchieved / totalCheckableUnits) * 100).toFixed(1);
     const daysRemaining = Math.max(0, TOTAL_DAYS - daysElapsed);

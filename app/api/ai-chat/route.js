@@ -3,6 +3,7 @@ import { dbConnect, isDbConnected } from '@/lib/db';
 import DailyLog from '@/lib/models/DailyLog';
 import WeeklyCheckin from '@/lib/models/WeeklyCheckin';
 import { getFallbackDaily, getFallbackWeekly } from '@/lib/seed';
+import UserSettings from '@/lib/models/UserSettings';
 
 export async function POST(req) {
   try {
@@ -26,9 +27,26 @@ export async function POST(req) {
     const userMessage = body.message || 'Give me personalized weight loss advice';
     const apiKey = body.apiKey || process.env.GEMINI_API_KEY || '';
 
-    const START_WEIGHT = 90.0;
-    const TARGET_WEIGHT = 80.0;
-    const TOTAL_DAYS = 107;
+    let START_WEIGHT = 90.0;
+    let TARGET_WEIGHT = 80.0;
+    let START_DATE_STR = '2026-09-17';
+    let END_DATE_STR = '2027-01-01';
+    if (dbReady) {
+      try {
+        const settings = await UserSettings.findOne({ key: 'default_goal' });
+        if (settings) {
+          if (settings.startWeight !== undefined) START_WEIGHT = settings.startWeight;
+          if (settings.targetWeight !== undefined) TARGET_WEIGHT = settings.targetWeight;
+          if (settings.startDate) START_DATE_STR = settings.startDate;
+          if (settings.endDate) END_DATE_STR = settings.endDate;
+        }
+      } catch (e) {}
+    }
+    const sDate = new Date(START_DATE_STR + 'T00:00:00Z');
+    const eDate = new Date(END_DATE_STR + 'T00:00:00Z');
+    const TOTAL_DAYS = Math.max(1, Math.round((eDate.getTime() - sDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+    const todayStr = new Date().toISOString().split('T')[0];
+    const daysElapsed = Math.max(1, dailyLogs.filter(d => d.date <= todayStr).length);
 
     const logsWithWeight = dailyLogs.filter(d => d.weight !== null && d.weight > 0);
     const currentWeight = logsWithWeight.length > 0 ? logsWithWeight[logsWithWeight.length - 1].weight : START_WEIGHT;
@@ -56,28 +74,34 @@ export async function POST(req) {
       totalCheckmarks += (d.workout?1:0) + (d.homeFood?1:0) + (d.noSweets?1:0) + (d.noMaida?1:0) + (d.noHotelFood?1:0) + (d.sleepTarget?1:0);
     });
 
-    const consistencyPct = +((totalCheckmarks / (TOTAL_DAYS * 6)) * 100).toFixed(1);
+    // Consistency measured against days actually elapsed, not the full plan
+    // duration, otherwise a user on day 1 shows a misleadingly tiny percentage.
+    const consistencyPct = +((totalCheckmarks / (daysElapsed * 6)) * 100).toFixed(1);
 
-    // Recent 7 Days Detailed Summary
-    const recentLogs = dailyLogs.slice(-7).map(d => 
+    // Recent days up to today (the full log array runs through the goal's
+    // end date, so a plain slice(-7) would grab future, not-yet-lived days).
+    const pastLogs = dailyLogs.filter(d => d.date <= todayStr);
+    const recentLogs = pastLogs.slice(-7).map(d =>
       `Date: ${d.displayDate || d.date} | Wt: ${d.weight ?? 'N/A'}kg | Prot: ${d.proteinGrams ?? 0}g | Sleep: ${d.sleepHours || 'N/A'} | Cardio: ${d.cardioTiming || 'None'} (${d.cardioMinutes || 0}m) | Habits: Workout:${d.workout?'✓':'✗'}, HomeFood:${d.homeFood?'✓':'✗'}, NoSweets:${d.noSweets?'✓':'✗'}`
-    ).join('\n');
+    ).join('\n') || 'No logs yet.';
 
-    // Weekly Summary
-    const weeklySummary = weeklyCheckins.map(w => 
+    // Weekly Summary — most recent weeks up to today, not the earliest ones
+    const pastWeeks = weeklyCheckins.filter(w => !w.startDate || w.startDate <= todayStr);
+    const weeklySummary = pastWeeks.slice(-8).map(w =>
       `Week ${w.weekNumber} (${w.startDate} - ${w.endDate}): Weight ${w.weeklyAvgWeight || 'N/A'}kg | Score: ${w.overallWeeklyScore}/100`
-    ).slice(0, 8).join('\n');
+    ).join('\n') || 'No weekly check-ins yet.';
 
     const systemPrompt = `You are FIT-TRACK AI, an elite personal fitness coach, sports nutritionist, and data analyst.
 You have FULL ACCESS to the user's entire live weight loss tracker database, reports, daily logs, and weekly scores.
 
 PLATFORM METRICS & DATASET:
-- Goal: Start Weight 90.0 kg -> Target Weight 80.0 kg (107 Days Total)
+- Goal: Start Weight ${START_WEIGHT} kg -> Target Weight ${TARGET_WEIGHT} kg (${TOTAL_DAYS} Days Total)
+- Today is Day ${daysElapsed} of ${TOTAL_DAYS} — do not describe the plan as finished or already over.
 - Current Weight: ${currentWeight} kg | Total Weight Lost: ${weightLost} kg
-- Overall Habit Consistency: ${consistencyPct}% (${totalCheckmarks} / ${TOTAL_DAYS * 6} checkmarks achieved)
+- Habit Consistency So Far: ${consistencyPct}% (${totalCheckmarks} / ${daysElapsed * 6} checkmarks achieved through Day ${daysElapsed})
 - Average Daily Protein: ${avgProtein} g/day
 - Average Daily Cardio: ${avgCardio} mins/day
-- Habit Totals (out of 107 days):
+- Habit Totals (out of ${daysElapsed} days elapsed so far):
   * Workout/Gym: ${habitCounts.workout} days
   * Home Cooked Meals: ${habitCounts.homeFood} days
   * Zero Sweets: ${habitCounts.noSweets} days
@@ -85,10 +109,10 @@ PLATFORM METRICS & DATASET:
   * Zero Hotel Food: ${habitCounts.noHotelFood} days
   * Sleep 11 PM - 9 AM: ${habitCounts.sleepTarget} days
 
-RECENT 7 DAYS LOGS:
+RECENT LOGS (most recent days up to today):
 ${recentLogs}
 
-WEEKLY SCORES SUMMARY:
+WEEKLY SCORES SUMMARY (most recent weeks up to today):
 ${weeklySummary}
 
 USER QUESTION: "${userMessage}"
