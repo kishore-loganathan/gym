@@ -80,14 +80,19 @@ export async function POST(req) {
       // otherwise pollute "your consistency so far" with future days.
       if (log.date > todayStr) return;
 
+      // There's no dedicated UI checkbox for "slept in the 11PM-9AM window" —
+      // sleepTarget stays false forever unless we also treat "logged any
+      // sleep hours" as meeting the habit, matching the dashboard's logic.
+      const sleptTarget = log.sleepTarget || (log.sleepHours && log.sleepHours.trim() !== '') || (log.sleepHoursNum && log.sleepHoursNum > 0);
+
       if (log.workout) habitCounts.workout++;
       if (log.homeFood) habitCounts.homeFood++;
       if (log.noSweets) habitCounts.noSweets++;
       if (log.noMaida) habitCounts.noMaida++;
       if (log.noHotelFood) habitCounts.noHotelFood++;
-      if (log.sleepTarget) habitCounts.sleepTarget++;
+      if (sleptTarget) habitCounts.sleepTarget++;
 
-      const cnt = (log.workout?1:0) + (log.homeFood?1:0) + (log.noSweets?1:0) + (log.noMaida?1:0) + (log.noHotelFood?1:0) + (log.sleepTarget?1:0);
+      const cnt = (log.workout?1:0) + (log.homeFood?1:0) + (log.noSweets?1:0) + (log.noMaida?1:0) + (log.noHotelFood?1:0) + (sleptTarget?1:0);
       totalCheckmarks += cnt;
       if (log.workout || cnt >= 4) tempStreak++; else tempStreak = 0;
       // Only count the streak up through today — the array includes

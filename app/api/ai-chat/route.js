@@ -68,13 +68,17 @@ export async function POST(req) {
     // pre-fills the whole goal range with sample habit values, which would
     // otherwise pollute "consistency so far" with future days.
     dailyLogs.filter(d => d.date <= todayStr).forEach(d => {
+      // There's no dedicated UI checkbox for "slept in the 11PM-9AM window" —
+      // sleepTarget stays false forever unless we also treat "logged any
+      // sleep hours" as meeting the habit, matching the dashboard's logic.
+      const sleptTarget = d.sleepTarget || (d.sleepHours && d.sleepHours.trim() !== '') || (d.sleepHoursNum && d.sleepHoursNum > 0);
       if (d.workout) habitCounts.workout++;
       if (d.homeFood) habitCounts.homeFood++;
       if (d.noSweets) habitCounts.noSweets++;
       if (d.noMaida) habitCounts.noMaida++;
       if (d.noHotelFood) habitCounts.noHotelFood++;
-      if (d.sleepTarget) habitCounts.sleepTarget++;
-      totalCheckmarks += (d.workout?1:0) + (d.homeFood?1:0) + (d.noSweets?1:0) + (d.noMaida?1:0) + (d.noHotelFood?1:0) + (d.sleepTarget?1:0);
+      if (sleptTarget) habitCounts.sleepTarget++;
+      totalCheckmarks += (d.workout?1:0) + (d.homeFood?1:0) + (d.noSweets?1:0) + (d.noMaida?1:0) + (d.noHotelFood?1:0) + (sleptTarget?1:0);
     });
 
     // Consistency measured against days actually elapsed, not the full plan
