@@ -3,6 +3,8 @@ import { dbConnect, isDbConnected } from '@/lib/db';
 import DailyLog from '@/lib/models/DailyLog';
 import WeeklyCheckin from '@/lib/models/WeeklyCheckin';
 import { getFallbackDaily, getFallbackWeekly } from '@/lib/seed';
+import UserSettings from '@/lib/models/UserSettings';
+import { excludeSundaysIf } from '@/lib/dateUtils';
 
 export async function GET(req) {
   return POST(req);
@@ -32,6 +34,15 @@ export async function POST(req) {
 
     if (!dailyLogs || dailyLogs.length === 0) dailyLogs = getFallbackDaily();
     if (!weeklyCheckins || weeklyCheckins.length === 0) weeklyCheckins = getFallbackWeekly();
+
+    let excludeSundays = false;
+    if (dbReady) {
+      try {
+        const settings = await UserSettings.findOne({ key: 'default_goal' });
+        excludeSundays = !!(settings && settings.excludeSundays);
+      } catch (e) {}
+    }
+    dailyLogs = excludeSundaysIf(dailyLogs, excludeSundays);
 
     const apiKey = body.apiKey || process.env.GEMINI_API_KEY || '';
 
@@ -87,7 +98,7 @@ Provide a structured, highly motivating AI Coaching Analysis in JSON format:
   "motivationalQuote": "Quote"
 }`;
 
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
         const apiRes = await fetch(geminiUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -104,9 +115,12 @@ Provide a structured, highly motivating AI Coaching Analysis in JSON format:
             const parsed = JSON.parse(candidateText);
             return NextResponse.json({ success: true, aiFeedback: parsed, source: 'gemini-api' });
           }
+        } else {
+          const errBody = await apiRes.text().catch(() => '');
+          console.error('Gemini API call failed:', apiRes.status, errBody);
         }
       } catch (e) {
-        console.warn('Gemini API call warning:', e.message);
+        console.error('Gemini API call error:', e.message);
       }
     }
 

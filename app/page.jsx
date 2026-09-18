@@ -13,11 +13,45 @@ import AiFeedbackModal from '@/components/AiFeedbackModal';
 import AiChatModal from '@/components/AiChatModal';
 import GoalSettingsModal from '@/components/GoalSettingsModal';
 import { getInitialState } from '@/lib/initialState';
+import { useToast } from '@/components/ToastProvider';
+
+const VALID_TABS = ['dashboard', 'daily', 'weekly', 'analytics', 'reports'];
 
 export default function Page() {
   const initial = getInitialState();
+  const { showToast } = useToast();
 
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTabState] = useState('dashboard');
+
+  // Keep the active tab in sync with the URL (?tab=...) so a refresh,
+  // browser back/forward, or a shared link lands on the same tab instead
+  // of always resetting to the dashboard.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tabFromUrl = params.get('tab');
+    if (tabFromUrl && VALID_TABS.includes(tabFromUrl)) {
+      setActiveTabState(tabFromUrl);
+    }
+
+    const onPopState = () => {
+      const p = new URLSearchParams(window.location.search);
+      const t = p.get('tab');
+      setActiveTabState(VALID_TABS.includes(t) ? t : 'dashboard');
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+
+  const setActiveTab = (tab) => {
+    setActiveTabState(tab);
+    const url = new URL(window.location.href);
+    if (tab === 'dashboard') {
+      url.searchParams.delete('tab');
+    } else {
+      url.searchParams.set('tab', tab);
+    }
+    window.history.pushState({}, '', url);
+  };
   const [stats, setStats] = useState(initial.stats);
   const [dailyLogs, setDailyLogs] = useState(initial.dailyLogs);
   const [weeklyCheckins, setWeeklyCheckins] = useState(initial.weeklyCheckins);
@@ -74,6 +108,7 @@ export default function Page() {
   }, []);
 
   const handleUpdateDailyLog = async (updatedLog) => {
+    const previous = dailyLogs.find(d => d.date === updatedLog.date);
     // Immediate Optimistic Update
     setDailyLogs(prev => prev.map(d => (d.date === updatedLog.date ? updatedLog : d)));
 
@@ -85,14 +120,24 @@ export default function Page() {
       });
 
       if (res.ok) {
-        syncWithServer(true);
+        const saved = await res.json();
+        // Merge the server-confirmed log in place instead of resyncing the
+        // whole table, so an in-flight update to a different log/checkbox
+        // isn't overwritten by a stale full refetch.
+        setDailyLogs(prev => prev.map(d => (d.date === saved.date ? saved : d)));
+      } else {
+        if (previous) setDailyLogs(prev => prev.map(d => (d.date === previous.date ? previous : d)));
+        showToast('Could not save your log. Please try again.', 'error');
       }
     } catch (err) {
       console.error('Error updating daily log:', err);
+      if (previous) setDailyLogs(prev => prev.map(d => (d.date === previous.date ? previous : d)));
+      showToast('Network error while saving your log.', 'error');
     }
   };
 
   const handleUpdateWeeklyCheckin = async (updatedWeekly) => {
+    const previous = weeklyCheckins.find(w => w.weekNumber === updatedWeekly.weekNumber);
     setWeeklyCheckins(prev => prev.map(w => (w.weekNumber === updatedWeekly.weekNumber ? updatedWeekly : w)));
 
     try {
@@ -103,10 +148,16 @@ export default function Page() {
       });
 
       if (res.ok) {
-        syncWithServer(true);
+        const saved = await res.json();
+        setWeeklyCheckins(prev => prev.map(w => (w.weekNumber === saved.weekNumber ? saved : w)));
+      } else {
+        if (previous) setWeeklyCheckins(prev => prev.map(w => (w.weekNumber === previous.weekNumber ? previous : w)));
+        showToast('Could not save your weekly check-in. Please try again.', 'error');
       }
     } catch (err) {
       console.error('Error updating weekly checkin:', err);
+      if (previous) setWeeklyCheckins(prev => prev.map(w => (w.weekNumber === previous.weekNumber ? previous : w)));
+      showToast('Network error while saving your weekly check-in.', 'error');
     }
   };
 
@@ -114,11 +165,13 @@ export default function Page() {
     try {
       const res = await fetch('/api/seed?force=true', { method: 'POST' });
       if (res.ok) {
-        alert('Database successfully re-seeded with 107 Days and 16 Weeks!');
+        showToast('Database successfully re-seeded with 107 Days and 16 Weeks!', 'success');
         syncWithServer(true);
+      } else {
+        showToast('Failed to re-seed database. Please try again.', 'error');
       }
     } catch (err) {
-      alert('Seeding error: ' + err.message);
+      showToast('Seeding error: ' + err.message, 'error');
     }
   };
 
@@ -129,7 +182,13 @@ export default function Page() {
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-slate-50 text-slate-900">
-      
+
+      {syncing && (
+        <div className="fixed top-0 left-0 right-0 z-[100] h-0.5 bg-emerald-500/20 overflow-hidden">
+          <div className="h-full w-1/3 bg-emerald-500 animate-[sync-bar_1s_ease-in-out_infinite]" />
+        </div>
+      )}
+
       {/* Sidebar Navigation */}
       <Sidebar
         activeTab={activeTab}
@@ -150,7 +209,7 @@ export default function Page() {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 min-h-screen overflow-y-auto">
         <main className="p-4 sm:p-6 lg:p-8 flex-1 max-w-7xl w-full mx-auto">
-          
+          <div key={activeTab} className="page-transition">
           {activeTab === 'dashboard' && (
             <Dashboard
               stats={stats}
@@ -189,7 +248,7 @@ export default function Page() {
           {activeTab === 'reports' && (
             <ReportsPage />
           )}
-
+          </div>
         </main>
 
         <footer className="border-t border-slate-200 py-4 px-6 text-center text-xs text-slate-500 bg-white">

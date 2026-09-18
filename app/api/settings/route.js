@@ -24,12 +24,13 @@ export async function GET() {
 export async function PUT(req) {
   try {
     const body = await req.json();
-    const { startWeight, targetWeight, startDate, endDate } = body;
+    const { startWeight, targetWeight, startDate, endDate, excludeSundays } = body;
 
     const startW = parseFloat(startWeight) || 90.0;
     const targetW = parseFloat(targetWeight) || 80.0;
     const startD = startDate || '2026-09-17';
     const endD = endDate || '2027-01-01';
+    const excludeSun = !!excludeSundays;
 
     await dbConnect();
     if (isDbConnected()) {
@@ -40,7 +41,8 @@ export async function PUT(req) {
             startWeight: startW,
             targetWeight: targetW,
             startDate: startD,
-            endDate: endD
+            endDate: endD,
+            excludeSundays: excludeSun
           }
         },
         { upsert: true, new: true }
@@ -55,7 +57,8 @@ export async function PUT(req) {
       startWeight: startW,
       targetWeight: targetW,
       startDate: startD,
-      endDate: endD
+      endDate: endD,
+      excludeSundays: excludeSun
     });
   } catch (err) {
     return NextResponse.json({ error: err.message }, { status: 500 });

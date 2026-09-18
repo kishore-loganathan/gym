@@ -1,4 +1,5 @@
 import './globals.css';
+import { ToastProvider } from '@/components/ToastProvider';
 
 export const metadata = {
   title: 'FIT-TRACK | 90 KG → 80 KG Weight Loss Tracker',
@@ -29,7 +30,7 @@ export default function RootLayout({ children }) {
         }} />
       </head>
       <body className="bg-slate-50 text-slate-900 antialiased min-h-screen">
-        {children}
+        <ToastProvider>{children}</ToastProvider>
       </body>
     </html>
   );

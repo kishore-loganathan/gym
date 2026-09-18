@@ -2,14 +2,17 @@
 
 import React, { useState, useEffect } from 'react';
 import { X, Scale, Target, Calendar, Save, Check } from 'lucide-react';
+import { useToast } from '@/components/ToastProvider';
 
 export default function GoalSettingsModal({ isOpen, onClose, stats = {}, onSaveSettings }) {
   if (!isOpen) return null;
 
+  const { showToast } = useToast();
   const [startWeight, setStartWeight] = useState(stats.startWeight || 90.0);
   const [targetWeight, setTargetWeight] = useState(stats.targetWeight || 80.0);
   const [startDate, setStartDate] = useState(stats.startDate || '2026-09-17');
   const [endDate, setEndDate] = useState(stats.endDate || '2027-01-01');
+  const [excludeSundays, setExcludeSundays] = useState(!!stats.excludeSundays);
   const [saving, setSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
 
@@ -19,6 +22,7 @@ export default function GoalSettingsModal({ isOpen, onClose, stats = {}, onSaveS
       if (stats.targetWeight !== undefined) setTargetWeight(stats.targetWeight);
       if (stats.startDate) setStartDate(stats.startDate);
       if (stats.endDate) setEndDate(stats.endDate);
+      if (stats.excludeSundays !== undefined) setExcludeSundays(!!stats.excludeSundays);
     }
   }, [stats, isOpen]);
 
@@ -31,7 +35,8 @@ export default function GoalSettingsModal({ isOpen, onClose, stats = {}, onSaveS
       startWeight: parseFloat(startWeight),
       targetWeight: parseFloat(targetWeight),
       startDate,
-      endDate
+      endDate,
+      excludeSundays
     };
 
     try {
@@ -45,17 +50,21 @@ export default function GoalSettingsModal({ isOpen, onClose, stats = {}, onSaveS
         setSavedSuccess(true);
         setTimeout(() => setSavedSuccess(false), 2000);
         if (onSaveSettings) onSaveSettings(payload);
+        showToast('Goal settings saved.', 'success');
         onClose();
+      } else {
+        showToast('Failed to save goal settings. Please try again.', 'error');
       }
     } catch (err) {
       console.error('Save settings error:', err);
+      showToast('Network error while saving goal settings.', 'error');
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm modal-backdrop">
       <div className="bg-white rounded-2xl w-full max-w-md p-6 relative border border-slate-200 shadow-xl animate-in fade-in zoom-in duration-200 text-slate-900">
         
         {/* Header */}
@@ -140,6 +149,20 @@ export default function GoalSettingsModal({ isOpen, onClose, stats = {}, onSaveS
               />
             </div>
           </div>
+
+          {/* Skip Sunday for Averages */}
+          <label className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer">
+            <span className="flex flex-col">
+              <span className="text-xs font-semibold text-slate-700">Exclude Sundays from averages</span>
+              <span className="text-[11px] text-slate-500">Protein, cardio & sleep averages will skip Sunday logs</span>
+            </span>
+            <input
+              type="checkbox"
+              checked={excludeSundays}
+              onChange={(e) => setExcludeSundays(e.target.checked)}
+              className="w-4 h-4 accent-emerald-600 shrink-0"
+            />
+          </label>
 
           {/* Summary Preview */}
           <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1 text-[11px] text-slate-600">

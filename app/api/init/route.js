@@ -4,6 +4,7 @@ import DailyLog from '@/lib/models/DailyLog';
 import WeeklyCheckin from '@/lib/models/WeeklyCheckin';
 import UserSettings from '@/lib/models/UserSettings';
 import { getFallbackDaily, getFallbackWeekly, getFallbackSettings } from '@/lib/dataFallback';
+import { excludeSundaysIf } from '@/lib/dateUtils';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,7 +49,7 @@ export async function GET(req) {
             WeeklyCheckin.find().sort({ weekNumber: 1 }),
             UserSettings.findOne({ key: 'default_goal' })
           ]),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('DB Query Timeout')), 2000))
+          new Promise((_, reject) => setTimeout(() => reject(new Error('DB Query Timeout')), 8000))
         ]);
 
         dailyLogs = results[0];
@@ -92,18 +93,21 @@ export async function GET(req) {
     const weightRemaining = Math.max(0, +(currentWeight - TARGET_WEIGHT).toFixed(2));
     const weightLossProgressPct = Math.min(100, Math.max(0, +((weightLost / TOTAL_WEIGHT_TO_LOSE) * 100).toFixed(1)));
 
+    const excludeSundays = !!settings.excludeSundays;
+    const avgLogs = excludeSundaysIf(dailyLogs, excludeSundays);
+
     // Protein calculations
-    const proteinLogs = dailyLogs.filter(d => d.proteinGrams !== null && d.proteinGrams > 0);
+    const proteinLogs = avgLogs.filter(d => d.proteinGrams !== null && d.proteinGrams > 0);
     const totalProteinGrams = proteinLogs.reduce((sum, d) => sum + d.proteinGrams, 0);
     const avgProteinGrams = proteinLogs.length > 0 ? +(totalProteinGrams / proteinLogs.length).toFixed(1) : 0;
 
     // Cardio calculations
-    const cardioLogs = dailyLogs.filter(d => d.cardioMinutes !== null && d.cardioMinutes > 0);
+    const cardioLogs = avgLogs.filter(d => d.cardioMinutes !== null && d.cardioMinutes > 0);
     const totalCardioMinutes = cardioLogs.reduce((sum, d) => sum + d.cardioMinutes, 0);
     const avgCardioMinutes = cardioLogs.length > 0 ? +(totalCardioMinutes / cardioLogs.length).toFixed(1) : 0;
 
     // Sleep calculations
-    const sleepLogs = dailyLogs.filter(d => {
+    const sleepLogs = avgLogs.filter(d => {
       if (d.sleepHoursNum !== null && d.sleepHoursNum > 0) return true;
       if (d.sleepHours) {
         const match = d.sleepHours.match(/(\d+(\.\d+)?)/);
@@ -212,6 +216,7 @@ export async function GET(req) {
         targetWeight: TARGET_WEIGHT,
         startDate: START_DATE_STR,
         endDate: END_DATE_STR,
+        excludeSundays,
         totalToLose: TOTAL_WEIGHT_TO_LOSE,
         currentWeight,
         latestLogDate,

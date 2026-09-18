@@ -7,7 +7,7 @@ export default function MongoDbConfigModal({ isOpen, onClose, dbConnected, onSee
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm modal-backdrop">
       <div className="bg-white rounded-2xl w-full max-w-lg p-6 relative border border-slate-200 shadow-2xl animate-in fade-in zoom-in duration-200 text-slate-900">
         
         {/* Header */}

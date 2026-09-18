@@ -2,8 +2,10 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Bot, User, X, Sparkles, RefreshCw, MessageSquare } from 'lucide-react';
+import { useToast } from '@/components/ToastProvider';
 
 export default function AiChatModal({ isOpen, onClose, stats }) {
+  const { showToast } = useToast();
   const [messages, setMessages] = useState([
     {
       sender: 'ai',
@@ -42,11 +44,16 @@ export default function AiChatModal({ isOpen, onClose, stats }) {
       if (res.ok) {
         const json = await res.json();
         setMessages(prev => [...prev, { sender: 'ai', text: json.answer || 'Keep pushing towards your 80 kg target!' }]);
+        if (json.source === 'fallback') {
+          showToast('AI is offline right now — showing general guidance instead of a personalized answer.', 'warning');
+        }
       } else {
-        setMessages(prev => [...prev, { sender: 'ai', text: 'Focus on hitting 120g+ protein and maintaining your cardio routine!' }]);
+        showToast('AI Coach request failed. Please try again.', 'error');
+        setMessages(prev => [...prev, { sender: 'ai', text: 'Sorry, I could not process that just now. Please try again in a moment.' }]);
       }
     } catch (err) {
-      setMessages(prev => [...prev, { sender: 'ai', text: 'Remember: consistency over perfection. Make sure to stay hydrated and get 7.5+ hours of sleep!' }]);
+      showToast('Network error reaching AI Coach.', 'error');
+      setMessages(prev => [...prev, { sender: 'ai', text: 'Sorry, I could not process that just now. Please try again in a moment.' }]);
     } finally {
       setLoading(false);
     }
@@ -60,7 +67,7 @@ export default function AiChatModal({ isOpen, onClose, stats }) {
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm modal-backdrop">
       <div className="bg-white rounded-2xl w-full max-w-xl h-[80vh] flex flex-col relative border border-slate-200 shadow-2xl animate-in fade-in zoom-in duration-200 text-slate-900 overflow-hidden">
         
         {/* Header */}

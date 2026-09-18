@@ -2,8 +2,10 @@
 
 import React, { useState } from 'react';
 import { Sparkles, Brain, Trophy, CheckCircle2, AlertTriangle, Lightbulb, RefreshCw, X, Zap, ShieldCheck } from 'lucide-react';
+import { useToast } from '@/components/ToastProvider';
 
 export default function AiFeedbackModal({ isOpen, onClose, stats, dailyLogs = [] }) {
+  const { showToast } = useToast();
   const generateDynamicFeedback = (currentStats) => {
     const consistencyPct = currentStats?.overallConsistencyPct || 0;
     const streak = currentStats?.streaks?.current || 0;
@@ -53,14 +55,19 @@ export default function AiFeedbackModal({ isOpen, onClose, stats, dailyLogs = []
         const json = await res.json();
         if (json.aiFeedback) {
           setAiData(json.aiFeedback);
+          if (json.source && json.source !== 'gemini-api') {
+            showToast('AI analysis is temporarily unavailable — showing a general summary based on your stats.', 'warning');
+          }
         } else {
           setAiData(generateDynamicFeedback(stats));
         }
       } else {
+        showToast('Could not refresh AI insights. Please try again.', 'error');
         setAiData(generateDynamicFeedback(stats));
       }
     } catch (err) {
       console.error('AI Error:', err);
+      showToast('Network error while fetching AI insights.', 'error');
       setAiData(generateDynamicFeedback(stats));
     } finally {
       setLoading(false);
@@ -77,7 +84,7 @@ export default function AiFeedbackModal({ isOpen, onClose, stats, dailyLogs = []
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm modal-backdrop">
       <div className="bg-white rounded-2xl w-full max-w-2xl p-6 relative border border-slate-200 shadow-2xl animate-in fade-in zoom-in duration-200 max-h-[90vh] overflow-y-auto text-slate-900">
         
         {/* Header */}

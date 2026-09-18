@@ -89,7 +89,7 @@ export default function QuickLogModal({ isOpen, onClose, selectedLog, dailyLogs 
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm modal-backdrop">
       <div className="bg-white w-full max-w-lg p-6 relative border border-slate-200 rounded-2xl shadow-xl animate-in fade-in zoom-in duration-200 max-h-[90vh] overflow-y-auto">
         
         {/* Header */}

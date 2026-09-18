@@ -3,6 +3,8 @@ import { dbConnect, isDbConnected } from '@/lib/db';
 import DailyLog from '@/lib/models/DailyLog';
 import WeeklyCheckin from '@/lib/models/WeeklyCheckin';
 import { getFallbackDaily, getFallbackWeekly } from '@/lib/seed';
+import UserSettings from '@/lib/models/UserSettings';
+import { excludeSundaysIf } from '@/lib/dateUtils';
 
 export async function GET() {
   await dbConnect();
@@ -20,6 +22,15 @@ export async function GET() {
 
   if (!dailyLogs || dailyLogs.length === 0) dailyLogs = getFallbackDaily();
   if (!weeklyCheckins || weeklyCheckins.length === 0) weeklyCheckins = getFallbackWeekly();
+
+  let excludeSundays = false;
+  if (dbReady) {
+    try {
+      const settings = await UserSettings.findOne({ key: 'default_goal' });
+      excludeSundays = !!(settings && settings.excludeSundays);
+    } catch (e) {}
+  }
+  dailyLogs = excludeSundaysIf(dailyLogs, excludeSundays);
 
   // 1. Weekly Reports (16 Weeks)
   let prevW = 90.0;
@@ -93,13 +104,21 @@ export async function GET() {
     };
   });
 
-  // 2. Monthly Reports (Sep 2026, Oct 2026, Nov 2026, Dec 2026)
-  const monthConfigs = [
-    { monthKey: '2026-09', monthName: 'September 2026' },
-    { monthKey: '2026-10', monthName: 'October 2026' },
-    { monthKey: '2026-11', monthName: 'November 2026' },
-    { monthKey: '2026-12', monthName: 'December 2026' }
-  ];
+  // 2. Monthly Reports — derived from the actual log date range instead of a hardcoded window
+  const monthConfigs = [];
+  if (dailyLogs.length > 0) {
+    const sortedDates = dailyLogs.map(d => d.date).sort();
+    const first = new Date(sortedDates[0] + 'T00:00:00Z');
+    const last = new Date(sortedDates[sortedDates.length - 1] + 'T00:00:00Z');
+    let cursor = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth(), 1));
+    const end = new Date(Date.UTC(last.getUTCFullYear(), last.getUTCMonth(), 1));
+    while (cursor <= end) {
+      const monthKey = `${cursor.getUTCFullYear()}-${String(cursor.getUTCMonth() + 1).padStart(2, '0')}`;
+      const monthName = cursor.toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+      monthConfigs.push({ monthKey, monthName });
+      cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+    }
+  }
 
   const monthlyReports = monthConfigs.map(({ monthKey, monthName }) => {
     const monthLogs = dailyLogs.filter(d => d.date.startsWith(monthKey));

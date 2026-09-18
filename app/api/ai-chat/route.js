@@ -99,7 +99,7 @@ INSTRUCTIONS:
 3. Keep response encouraging, structured with bold key points and markdown formatting. Be highly helpful and direct.`;
 
     try {
-      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
       const apiRes = await fetch(geminiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -112,11 +112,14 @@ INSTRUCTIONS:
         const data = await apiRes.json();
         const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
         if (text) {
-          return NextResponse.json({ success: true, answer: text });
+          return NextResponse.json({ success: true, answer: text, source: 'gemini' });
         }
+      } else {
+        const errBody = await apiRes.text().catch(() => '');
+        console.error('Gemini AI Chat call failed:', apiRes.status, errBody);
       }
     } catch (e) {
-      console.warn('Gemini AI Chat call warning:', e.message);
+      console.error('Gemini AI Chat call error:', e.message);
     }
 
     // Smart Domain-Aware AI Fitness Engine (Contextual Q&A)
@@ -172,7 +175,7 @@ To reach **80 kg** efficiently:
 Feel free to ask me about workouts, meal plans, or weight loss tips!`;
     }
 
-    return NextResponse.json({ success: true, answer });
+    return NextResponse.json({ success: true, answer, source: 'fallback' });
 
   } catch (err) {
     return NextResponse.json({ error: err.message }, { status: 500 });
