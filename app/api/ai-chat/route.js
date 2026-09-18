@@ -64,7 +64,10 @@ export async function POST(req) {
     const habitCounts = { workout: 0, homeFood: 0, noSweets: 0, noMaida: 0, noHotelFood: 0, sleepTarget: 0 };
     let totalCheckmarks = 0;
     
-    dailyLogs.forEach(d => {
+    // Only count days that have actually happened — the seed/demo data
+    // pre-fills the whole goal range with sample habit values, which would
+    // otherwise pollute "consistency so far" with future days.
+    dailyLogs.filter(d => d.date <= todayStr).forEach(d => {
       if (d.workout) habitCounts.workout++;
       if (d.homeFood) habitCounts.homeFood++;
       if (d.noSweets) habitCounts.noSweets++;

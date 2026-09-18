@@ -138,7 +138,15 @@ export async function GET(req) {
 
     dailyLogs.forEach((log) => {
       const isLogged = log.workout || log.homeFood || log.noSweets || log.noMaida || log.noHotelFood || (log.weight !== null && log.weight > 0) || (log.proteinGrams !== null && log.proteinGrams > 0) || (log.cardioMinutes !== null && log.cardioMinutes > 0);
+      const isElapsed = log.date <= todayStr || isLogged;
       if (log.date < todayStr || isLogged) daysElapsed++;
+
+      // Habit counts & checkmarks only count days that have actually
+      // happened — the seed/demo data pre-fills the whole goal range
+      // (including future days) with sample habit values, which would
+      // otherwise pollute "your consistency so far" with days you
+      // haven't lived yet.
+      if (!isElapsed) return;
 
       if (log.workout) habitCounts.workout++;
       if (log.homeFood) habitCounts.homeFood++;
@@ -167,7 +175,9 @@ export async function GET(req) {
       }
     });
 
-    const totalCheckableUnits = TOTAL_DAYS * 6;
+    // Measured against days actually elapsed, not the full goal length —
+    // otherwise consistency would always look artificially low early on.
+    const totalCheckableUnits = Math.max(1, daysElapsed) * 6;
     const overallConsistencyPct = +((totalCheckmarksAchieved / totalCheckableUnits) * 100).toFixed(1);
     const daysRemaining = Math.max(0, TOTAL_DAYS - daysElapsed);
     const weeksElapsed = Math.max(1, +(daysElapsed / 7).toFixed(1));
@@ -255,12 +265,12 @@ export async function GET(req) {
         },
         habitCounts,
         habitPercentages: {
-          workout: +((habitCounts.workout / TOTAL_DAYS) * 100).toFixed(1),
-          homeFood: +((habitCounts.homeFood / TOTAL_DAYS) * 100).toFixed(1),
-          noSweets: +((habitCounts.noSweets / TOTAL_DAYS) * 100).toFixed(1),
-          noMaida: +((habitCounts.noMaida / TOTAL_DAYS) * 100).toFixed(1),
-          noHotelFood: +((habitCounts.noHotelFood / TOTAL_DAYS) * 100).toFixed(1),
-          sleepTarget: +((habitCounts.sleepTarget / TOTAL_DAYS) * 100).toFixed(1)
+          workout: +((habitCounts.workout / Math.max(1, daysElapsed)) * 100).toFixed(1),
+          homeFood: +((habitCounts.homeFood / Math.max(1, daysElapsed)) * 100).toFixed(1),
+          noSweets: +((habitCounts.noSweets / Math.max(1, daysElapsed)) * 100).toFixed(1),
+          noMaida: +((habitCounts.noMaida / Math.max(1, daysElapsed)) * 100).toFixed(1),
+          noHotelFood: +((habitCounts.noHotelFood / Math.max(1, daysElapsed)) * 100).toFixed(1),
+          sleepTarget: +((habitCounts.sleepTarget / Math.max(1, daysElapsed)) * 100).toFixed(1)
         },
         streaks: { current: currentStreak, longest: longestStreak }
       },

@@ -75,6 +75,11 @@ export async function POST(req) {
 
     dailyLogs.forEach((log) => {
       if (log.date <= todayStr) daysElapsed++;
+      // Skip days that haven't happened yet — the seed/demo data pre-fills
+      // the whole goal range with sample habit values, which would
+      // otherwise pollute "your consistency so far" with future days.
+      if (log.date > todayStr) return;
+
       if (log.workout) habitCounts.workout++;
       if (log.homeFood) habitCounts.homeFood++;
       if (log.noSweets) habitCounts.noSweets++;

@@ -335,7 +335,7 @@ export default function Dashboard({ stats, dailyLogs = [], weeklyCheckins = [], 
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
         <h3 className="text-base font-bold font-heading text-slate-900 mb-4 flex items-center gap-2">
           <Dumbbell className="w-4 h-4 text-emerald-600" />
-          Daily Metrics & Non-Negotiables Breakdown ({totalDays} Days Total)
+          Daily Metrics & Non-Negotiables Breakdown (Day {stats.daysElapsed || 0} of {totalDays})
         </h3>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -349,7 +349,7 @@ export default function Dashboard({ stats, dailyLogs = [], weeklyCheckins = [], 
                 <span className="text-slate-900">Gym / Workout ✓</span>
                 <span className="text-emerald-700">{stats.habitPercentages?.workout}%</span>
               </div>
-              <p className="text-xs text-slate-500">{stats.habitCounts?.workout || 0} / {totalDays} days</p>
+              <p className="text-xs text-slate-500">{stats.habitCounts?.workout || 0} / {stats.daysElapsed || 0} days so far</p>
             </div>
           </div>
 
@@ -362,7 +362,7 @@ export default function Dashboard({ stats, dailyLogs = [], weeklyCheckins = [], 
                 <span className="text-slate-900">Protein Target Intake (g)</span>
                 <span className="text-cyan-700">{stats.averages?.avgProteinGrams || 0}g avg</span>
               </div>
-              <p className="text-xs text-slate-500">{stats.averages?.proteinDaysLogged || 0} / {totalDays} days logged</p>
+              <p className="text-xs text-slate-500">{stats.averages?.proteinDaysLogged || 0} / {stats.daysElapsed || 0} days so far</p>
             </div>
           </div>
 
@@ -375,7 +375,7 @@ export default function Dashboard({ stats, dailyLogs = [], weeklyCheckins = [], 
                 <span className="text-slate-900">Sleep Duration</span>
                 <span className="text-purple-700">{stats.averages?.avgSleepHours || 0}h avg</span>
               </div>
-              <p className="text-xs text-slate-500">{stats.averages?.sleepDaysLogged || 0} / {totalDays} days logged</p>
+              <p className="text-xs text-slate-500">{stats.averages?.sleepDaysLogged || 0} / {stats.daysElapsed || 0} days so far</p>
             </div>
           </div>
 
@@ -388,7 +388,7 @@ export default function Dashboard({ stats, dailyLogs = [], weeklyCheckins = [], 
                 <span className="text-slate-900">No Sweets/Chocolate ✓</span>
                 <span className="text-amber-700">{stats.habitPercentages?.noSweets}%</span>
               </div>
-              <p className="text-xs text-slate-500">{stats.habitCounts?.noSweets || 0} / {totalDays} days</p>
+              <p className="text-xs text-slate-500">{stats.habitCounts?.noSweets || 0} / {stats.daysElapsed || 0} days so far</p>
             </div>
           </div>
 
@@ -401,7 +401,7 @@ export default function Dashboard({ stats, dailyLogs = [], weeklyCheckins = [], 
                 <span className="text-slate-900">No Maida ✓</span>
                 <span className="text-indigo-700">{stats.habitPercentages?.noMaida}%</span>
               </div>
-              <p className="text-xs text-slate-500">{stats.habitCounts?.noMaida || 0} / {totalDays} days</p>
+              <p className="text-xs text-slate-500">{stats.habitCounts?.noMaida || 0} / {stats.daysElapsed || 0} days so far</p>
             </div>
           </div>
 
@@ -414,7 +414,7 @@ export default function Dashboard({ stats, dailyLogs = [], weeklyCheckins = [], 
                 <span className="text-slate-900">No Hotel Food ✓</span>
                 <span className="text-pink-700">{stats.habitPercentages?.noHotelFood}%</span>
               </div>
-              <p className="text-xs text-slate-500">{stats.habitCounts?.noHotelFood || 0} / {totalDays} days</p>
+              <p className="text-xs text-slate-500">{stats.habitCounts?.noHotelFood || 0} / {stats.daysElapsed || 0} days so far</p>
             </div>
           </div>
 
